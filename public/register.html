@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Register - IoT Dashboard</title>
+    <style>
+        body { 
+            background: #0f172a; 
+            color: white; 
+            font-family: sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+        }
+        .box { 
+            background: #1e293b; 
+            padding: 30px; 
+            border-radius: 15px; 
+            width: 300px; 
+            text-align: center; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        h2 { margin-bottom: 20px; color: #38bdf8; }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            border-radius: 8px; 
+            border: 1px solid #334155; 
+            background: #0f172a;
+            color: white;
+            box-sizing: border-box;
+        }
+        button { 
+            width: 100%; 
+            padding: 12px; 
+            background: #22c55e; 
+            border: none; 
+            color: white; 
+            cursor: pointer; 
+            border-radius: 8px; 
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        button:hover { background: #16a34a; }
+        a { color: #94a3b8; text-decoration: none; font-size: 14px; }
+        a:hover { color: #38bdf8; }
+        .footer-link { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Register</h2>
+        <input type="text" id="username" placeholder="Username / Email" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <button onclick="doReg()">Sign Up</button>
+        
+        <div class="footer-link">
+            <a href="login.html">กลับหน้า Login</a>
+        </div>
+    </div>
+
+    <script>
+        async function doReg() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+
+            if (!u || !p) {
+                alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+                return;
+            }
+
+            try {
+                // แก้ไข Path จาก /api/register เป็น /register เพื่อให้ตรงกับ app.js
+                const res = await fetch('/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, password: p })
+                });
+
+                if (res.ok) {
+                    alert('สมัครสมาชิกสำเร็จ!');
+                    location.href = 'login.html';
+                } else {
+                    // หาก Server ตอบกลับมาไม่สำเร็จ (เช่น ชื่อซ้ำ)
+                    alert('ชื่อผู้ใช้นี้อาจมีคนใช้แล้ว หรือระบบขัดข้อง');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('ไม่สามารถเชื่อมต่อกับ Server ได้');
+            }
+        }
+    </script>
+</body>
+</html>

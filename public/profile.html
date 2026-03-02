@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>แก้ไขข้อมูลส่วนตัว</title>
+    <style>
+        body { background: #0f172a; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { background: #1e293b; padding: 30px; border-radius: 15px; width: 350px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #38bdf8; border: none; color: white; cursor: pointer; border-radius: 8px; font-weight: bold; margin-top: 10px; }
+        .back-link { margin-top: 15px; display: block; color: #94a3b8; text-decoration: none; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>แก้ไขข้อมูลส่วนตัว</h2>
+        <p style="color: #94a3b8; font-size: 0.8rem;">แก้ไขชื่อผู้ใช้หรือรหัสผ่านของคุณ</p>
+        <input type="text" id="editUser" placeholder="ชื่อผู้ใช้ใหม่">
+        <input type="password" id="editPass" placeholder="รหัสผ่านใหม่">
+        <button onclick="updateProfile()">บันทึกการเปลี่ยนแปลง</button>
+        <a href="index.html" class="back-link">← กลับไปหน้า Dashboard</a>
+    </div>
+
+    <script>
+        const currentUsername = localStorage.getItem('user');
+        if(!currentUsername) location.href = 'login.html';
+
+        // โหลดข้อมูลเดิมมาโชว์
+        async function loadProfile() {
+            const res = await fetch(`/api/me?username=${currentUsername}`);
+            const data = await res.json();
+            document.getElementById('editUser').value = data.username;
+            document.getElementById('editPass').value = data.password;
+        }
+
+        async function updateProfile() {
+            const newUsername = document.getElementById('editUser').value;
+            const newPassword = document.getElementById('editPass').value;
+
+            const res = await fetch('/api/users/update', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    oldUsername: currentUsername,
+                    newUsername: newUsername,
+                    newPassword: newPassword
+                })
+            });
+
+            const data = await res.json();
+            if(data.status === 'ok') {
+                alert('อัปเดตเรียบร้อย! กรุณาเข้าสู่ระบบใหม่');
+                localStorage.clear();
+                location.href = 'login.html';
+            } else {
+                alert(data.message);
+            }
+        }
+        loadProfile();
+    </script>
+</body>
+</html>

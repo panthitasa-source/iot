@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel</title>
+    <style>
+        body { background: #0f172a; color: white; font-family: sans-serif; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #334155; padding: 12px; text-align: left; }
+        th { background: #1e293b; }
+        .btn-del { background: #ef4444; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; }
+        .form-add { background: #1e293b; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        input { padding: 8px; margin-right: 10px; border-radius: 5px; border: none; }
+    </style>
+</head>
+<body>
+    <h1>Admin Panel - จัดการข้อมูลเซนเซอร์</h1>
+    
+    <div class="form-add">
+        <h3>เพิ่มข้อมูลใหม่</h3>
+        <input type="number" id="newTemp" placeholder="อุณหภูมิ">
+        <input type="number" id="newHumi" placeholder="ความชื้น">
+        <button onclick="addData()" style="background: #22c55e; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer;">เพิ่มข้อมูล</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr><th>ID</th><th>อุณหภูมิ</th><th>ความชื้น</th><th>เวลา</th><th>จัดการ</th></tr>
+        </thead>
+        <tbody id="dataTable"></tbody>
+    </table>
+
+    <script>
+        if(localStorage.getItem('role') !== 'admin') { alert('เฉพาะแอดมินเท่านั้น!'); location.href='/login.html'; }
+
+        async function loadData() {
+            const res = await fetch('/api/sensors');
+            const data = await res.json();
+            const table = document.getElementById('dataTable');
+            table.innerHTML = data.map(row => `
+                <tr>
+                    <td>${row.id}</td>
+                    <td>${row.temp} °C</td>
+                    <td>${row.humi} %</td>
+                    <td>${row.time}</td>
+                    <td><button class="btn-del" onclick="deleteData(${row.id})">ลบ</button></td>
+                </tr>
+            `).join('');
+        }
+
+        async function addData() {
+            await fetch('/api/sensors', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({temp: newTemp.value, humi: newHumi.value})
+            });
+            newTemp.value = ''; newHumi.value = '';
+            loadData();
+        }
+
+        async function deleteData(id) {
+            if(confirm('ยืนยันการลบ?')) {
+                await fetch(`/api/sensors/${id}`, { method: 'DELETE' });
+                loadData();
+            }
+        }
+
+        loadData();
+    </script>
+</body>
+</html> 

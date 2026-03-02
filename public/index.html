@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart IoT Monitoring</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; margin: 0; padding: 20px; }
+        .nav { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 25px; border-radius: 12px; margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: #1e293b; padding: 20px; border-radius: 15px; text-align: center; border-top: 4px solid #38bdf8; }
+        .stat-card h3 { margin: 0; font-size: 0.9rem; color: #94a3b8; }
+        .stat-card p { margin: 10px 0 0; font-size: 1.8rem; font-weight: bold; color: #f1f5f9; }
+        .main-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        button { padding: 10px 15px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-excel { background: #22c55e; color: white; margin-top: 10px; width: 100%; }
+        .btn-logout { background: #ef4444; color: white; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+    <h2>📊 Smart Dashboard</h2>
+    <div>
+        <span>ผู้ใช้: <b id="userDisplay"></b></span>
+        <button onclick="location.href='profile.html'" style="background: #6366f1; margin-left:10px">⚙️ แก้ไขโปรไฟล์</button>
+        <button class="btn-logout" onclick="localStorage.clear(); location.href='login.html'" style="margin-left:10px">Logout</button>
+    </div>
+</div>
+
+    <div class="stats-grid">
+        <div class="stat-card" style="border-top-color: #ef4444;">
+            <h3>อุณหภูมิสูงสุด (Max)</h3>
+            <p id="maxT">--</p>
+        </div>
+        <div class="stat-card" style="border-top-color: #38bdf8;">
+            <h3>อุณหภูมิเฉลี่ย (Avg)</h3>
+            <p id="avgT">--</p>
+        </div>
+        <div class="stat-card" style="border-top-color: #fbbf24;">
+            <h3>อุณหภูมิต่ำสุด (Min)</h3>
+            <p id="minT">--</p>
+        </div>
+    </div>
+
+    <div class="main-grid">
+        <div class="card">
+            <h3>ตารางข้อมูล</h3>
+            <table id="logs"></table>
+            <button class="btn-excel" onclick="exportExcel()">📥 ดาวน์โหลดไฟล์ Excel</button>
+        </div>
+        <div class="card">
+            <h3>กราฟความร้อนแบบเรียลไทม์</h3>
+            <canvas id="chart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const user = localStorage.getItem('user');
+        if(!user) location.href = 'login.html';
+        document.getElementById('userDisplay').innerText = user;
+
+        const ctx = document.getElementById('chart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Temp (°C)', data: [], borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.1)', fill: true, tension: 0.4 }] },
+            options: { scales: { y: { grid: { color: '#334155' } } } }
+        });
+
+        let currentData = [];
+
+        async function refresh() {
+            const res = await fetch('/api/sensors');
+            const result = await res.json();
+            currentData = result.logs;
+
+            // 1. อัปเดตการ์ดสถิติ
+            document.getElementById('maxT').innerText = result.stats.maxT?.toFixed(1) + ' °C';
+            document.getElementById('avgT').innerText = result.stats.avgT?.toFixed(1) + ' °C';
+            document.getElementById('minT').innerText = result.stats.minT?.toFixed(1) + ' °C';
+
+            // 2. อัปเดตตาราง
+            const logs = document.getElementById('logs');
+            logs.innerHTML = '<tr><th>เวลา</th><th>อุณหภูมิ</th></tr>' + 
+                currentData.map(d => `<tr><td>${d.time}</td><td>${d.temp} °C</td></tr>`).join('');
+
+            // 3. อัปเดตกราฟ
+            const plotData = [...currentData].reverse();
+            chart.data.labels = plotData.map(d => d.time);
+            chart.data.datasets[0].data = plotData.map(d => d.temp);
+            chart.update();
+        }
+
+        function exportExcel() {
+            const worksheet = XLSX.utils.json_to_sheet(currentData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "SensorData");
+            XLSX.writeFile(workbook, "iot_data_report.xlsx");
+        }
+
+        setInterval(refresh, 3000);
+        refresh();
+    </script>
+</body>
+</html>
