@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart IoT Monitoring - Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: white; margin: 0; padding: 20px; }
+        .nav { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 25px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: #1e293b; padding: 20px; border-radius: 15px; text-align: center; border-top: 4px solid #38bdf8; transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-card h3 { margin: 0; font-size: 0.9rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-card p { margin: 10px 0 0; font-size: 2rem; font-weight: bold; color: #f1f5f9; }
+        
+        .history-menu { background: #1e293b; padding: 20px; border-radius: 15px; margin-bottom: 20px; border-left: 4px solid #6366f1; }
+        .filter-group { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+        
+        .main-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 15px; height: fit-content; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .table-container { max-height: 450px; overflow-y: auto; margin-top: 15px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { position: sticky; top: 0; background: #334155; padding: 12px; text-align: left; z-index: 1; }
+        td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; color: #cbd5e1; }
+        tr:hover { background: #1e293b; }
+        
+        button { padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; transition: 0.3s; display: flex; align-items: center; gap: 5px; }
+        button:active { transform: scale(0.95); }
+        .btn-green { background: #10b981; color: white; }
+        .btn-red { background: #ef4444; color: white; }
+        .btn-gray { background: #475569; color: white; }
+        .btn-indigo { background: #6366f1; color: white; }
+        
+        input[type="date"], select { padding: 8px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; outline: none; }
+        .status-badge { font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; background: #334155; color: #38bdf8; margin-bottom: 10px; display: inline-block; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="nav">
+        <h2>📊 Smart IoT Dashboard</h2>
+        <div style="display: flex; align-items: center;">
+            <span>สวัสดี, <b id="userDisplay" style="color: #38bdf8;">--</b></span>
+            <button onclick="location.href='profile.html'" class="btn-indigo" style="margin-left:20px">⚙️ โปรไฟล์</button>
+            <button class="btn-red" onclick="logout()" style="margin-left:10px">Logout</button>
+        </div>
+    </div>
+
+    <div class="history-menu">
+        <div id="modeStatus" class="status-badge">🟢 โหมด: Real-time</div>
+        <h3 style="margin: 0;">🔍 ค้นหาข้อมูลย้อนหลัง</h3>
+        <div class="filter-group">
+            <button class="btn-gray" onclick="loadHistory('day')">วันนี้</button>
+            <button class="btn-gray" onclick="loadHistory('month')">เดือนนี้</button>
+            <button class="btn-gray" onclick="loadHistory('year')">ปีนี้</button>
+            <span style="color: #475569; margin: 0 10px;">|</span>
+            <input type="date" id="startDate"> 
+            <span>ถึง</span>
+            <input type="date" id="endDate">
+            <button class="btn-green" onclick="loadCustomHistory()">ดูข้อมูล</button>
+            <button class="btn-red" onclick="resetToRealtime()">กลับหน้า Real-time</button>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card" style="border-top-color: #ef4444;">
+            <h3>อุณหภูมิสูงสุด</h3>
+            <p id="maxT">--</p>
+        </div>
+        <div class="stat-card" style="border-top-color: #38bdf8;">
+            <h3>อุณหภูมิเฉลี่ย</h3>
+            <p id="avgT">--</p>
+        </div>
+        <div class="stat-card" style="border-top-color: #fbbf24;">
+            <h3>อุณหภูมิต่ำสุด</h3>
+            <p id="minT">--</p>
+        </div>
+    </div>
+
+    <div class="main-grid">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0;">ตารางข้อมูลความร้อน</h3>
+                <button class="btn-green" style="padding: 5px 10px; font-size: 0.8rem;" onclick="exportExcel()">📥 Excel</button>
+            </div>
+            <div class="table-container">
+                <table id="logsTable">
+                    <thead>
+                        <tr><th>เวลา</th><th>อุณหภูมิ</th></tr>
+                    </thead>
+                    <tbody id="logBody"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3 id="chartTitle">📈 กราฟความร้อนแบบเรียลไทม์</h3>
+            <canvas id="chart"></canvas>
+        </div>
+    </div>
+
+    <div id="adminPanel" class="card" style="display: none; margin-top: 20px;">
+        <h3 style="color: #38bdf8; margin-top: 0;">👥 จัดการสมาชิก (Admin Only)</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>ชื่อผู้ใช้</th>
+                        <th>บทบาท</th>
+                        <th>จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="userListBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const user = localStorage.getItem('user');
+        const role = localStorage.getItem('role');
+        if(!user) location.href = 'login.html';
+        
+        document.getElementById('userDisplay').innerText = user;
+
+        let isRealtime = true;
+        let currentData = [];
+
+        // --- ตั้งค่ากราฟ Chart.js ---
+        const ctx = document.getElementById('chart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: { 
+                labels: [], 
+                datasets: [{ 
+                    label: 'อุณหภูมิ (°C)', 
+                    data: [], 
+                    borderColor: '#f43f5e', 
+                    backgroundColor: 'rgba(244,63,94,0.1)', 
+                    fill: true, 
+                    tension: 0.4,
+                    pointRadius: 2
+                }] 
+            },
+            options: { 
+                responsive: true,
+                maintainAspectRatio: true,
+                animation: { duration: 800 },
+                scales: { 
+                    y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' }, beginAtZero: false },
+                    x: { ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 45 } }
+                } 
+            }
+        });
+
+        // --- ฟังก์ชันจัดรูปแบบเวลา ---
+        function formatTimeDisplay(item) {
+            if (item.time) return item.time;
+            if (item.timestamp) {
+                const date = new Date(item.timestamp);
+                return date.toLocaleTimeString('th-TH', { hour12: false });
+            }
+            return "--:--";
+        }
+
+        // --- อัปเดต UI แดชบอร์ด ---
+        function updateUI(logs, stats) {
+            currentData = logs || [];
+            
+            if (stats && isRealtime) {
+                document.getElementById('maxT').innerText = (stats.maxT || 0).toFixed(1) + ' °C';
+                document.getElementById('avgT').innerText = (stats.avgT || 0).toFixed(1) + ' °C';
+                document.getElementById('minT').innerText = (stats.minT || 0).toFixed(1) + ' °C';
+            } else if (currentData.length > 0) {
+                const temps = currentData.map(d => parseFloat(d.temp)).filter(t => !isNaN(t));
+                const max = Math.max(...temps);
+                const min = Math.min(...temps);
+                const avg = temps.reduce((a, b) => a + b, 0) / temps.length;
+                document.getElementById('maxT').innerText = max.toFixed(1) + ' °C';
+                document.getElementById('minT').innerText = min.toFixed(1) + ' °C';
+                document.getElementById('avgT').innerText = avg.toFixed(1) + ' °C';
+            }
+
+            const logBody = document.getElementById('logBody');
+            logBody.innerHTML = currentData.length > 0 ? 
+                currentData.slice(0, 50).map(d => `
+                    <tr>
+                        <td>${formatTimeDisplay(d)}</td>
+                        <td style="color: ${parseFloat(d.temp) > 35 ? '#f43f5e' : '#38bdf8'}">
+                            ${parseFloat(d.temp).toFixed(2)} °C
+                        </td>
+                    </tr>
+                `).join('') : '<tr><td colspan="2" style="text-align:center">ไม่มีข้อมูล</td></tr>';
+            
+            chart.data.labels = currentData.map(d => formatTimeDisplay(d));
+            chart.data.datasets[0].data = currentData.map(d => parseFloat(d.temp));
+            chart.update(isRealtime ? 'active' : 'none'); 
+        }
+
+        // --- ระบบดึงข้อมูล ---
+        async function refresh() {
+            if (!isRealtime) return;
+            try {
+                const res = await fetch('/api/sensors');
+                const result = await res.json();
+                updateUI(result.logs, result.stats);
+            } catch (err) { console.error("Real-time Error"); }
+        }
+
+        async function loadHistory(range) {
+            isRealtime = false;
+            document.getElementById('modeStatus').innerText = `🟡 โหมด: ย้อนหลัง (${range})`;
+            try {
+                const res = await fetch(`/api/sensors/history?range=${range}`);
+                const data = await res.json();
+                updateUI(data, null);
+            } catch (err) { alert("ดึงข้อมูลไม่สำเร็จ"); }
+        }
+
+        async function loadCustomHistory() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            if (!start || !end) return alert("เลือกวันที่ก่อน");
+            isRealtime = false;
+            document.getElementById('modeStatus').innerText = `🟡 โหมด: กำหนดเอง`;
+            try {
+                const res = await fetch(`/api/sensors/history?start=${start}&end=${end}`);
+                const data = await res.json();
+                updateUI(data, null);
+            } catch (err) { alert("เกิดข้อผิดพลาด"); }
+        }
+
+        function resetToRealtime() {
+            isRealtime = true;
+            document.getElementById('modeStatus').innerText = "🟢 โหมด: Real-time";
+            refresh();
+        }
+
+        function logout() {
+            localStorage.clear();
+            location.href = 'login.html';
+        }
+
+        function exportExcel() {
+            if (currentData.length === 0) return alert("ไม่มีข้อมูล");
+            const worksheet = XLSX.utils.json_to_sheet(currentData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Logs");
+            XLSX.writeFile(workbook, `IoT_Data.xlsx`);
+        }
+
+        // --- ส่วนของ ADMIN MANAGEMENT ---
+        async function checkAdmin() {
+            if (role === 'admin') {
+                document.getElementById('adminPanel').style.display = 'block';
+                loadUserList();
+            }
+        }
+
+        async function loadUserList() {
+            try {
+                const res = await fetch('/api/admin/users');
+                const users = await res.json();
+                const body = document.getElementById('userListBody');
+                body.innerHTML = users.map(u => `
+                    <tr>
+                        <td>${u.id}</td>
+                        <td>${u.username}</td>
+                        <td>
+                            <select onchange="updateRole(${u.id}, this.value)" ${u.username === 'admin' ? 'disabled' : ''}>
+                                <option value="user" ${u.role === 'user' ? 'selected' : ''}>User</option>
+                                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                            </select>
+                        </td>
+                        <td>
+                            <button class="btn-red" onclick="deleteUser(${u.id})" 
+                                style="padding: 5px 10px; font-size: 0.7rem;"
+                                ${u.username === 'admin' ? 'disabled' : ''}>ลบ</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) { console.error("Admin Load Error"); }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm("ลบสมาชิกรายนี้ใช่หรือไม่?")) return;
+            const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+            if (res.ok) loadUserList();
+        }
+
+        async function updateRole(id, newRole) {
+            await fetch('/api/admin/users/role', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, newRole })
+            });
+        }
+
+        // --- เริ่มต้นการทำงาน ---
+        checkAdmin(); // เช็คสิทธิ์ Admin
+        setInterval(refresh, 3000); // ดึงข้อมูลเรียลไทม์
+        refresh(); // รันทันทีครั้งแรก
+    </script>
+</body>
+</html>
